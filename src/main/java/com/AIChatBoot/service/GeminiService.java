@@ -31,7 +31,6 @@ public class GeminiService {
         this.restTemplate = restTemplate;
     }
 
-
     public String getGeminiResponseText(String prompt) {
         String url = apiUrl + "/" + defaultModel + ":generateContent?key=" + apiKey;
         log.debug("Gemini API URL: {}", url);
@@ -39,44 +38,54 @@ public class GeminiService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
+        // Proper request body: contents: [ { parts: [ { text: prompt } ] } ]
+        Map<String, Object> textPart = new HashMap<>();
+        textPart.put("text", prompt);
+
         Map<String, Object> content = new HashMap<>();
-        content.put("parts", new HashMap<String, String>() {{
-            put("text", prompt);
-        }});
+        content.put("parts", List.of(textPart));
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("contents", new HashMap[]{(HashMap) content});
+        Map<String, Object> body = new HashMap<>();
+        body.put("contents", List.of(content));
 
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(data, headers);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
+            var response = restTemplate.postForEntity(url, entity, Map.class);
             log.debug("Gemini API Response: {}", response.getBody());
 
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.getBody().get("candidates");
-                if (candidates != null && !candidates.isEmpty()) {
-                    Map<String, Object> candidate = candidates.get(0);
-                    Map<String, Object> contentMap = (Map<String, Object>) candidate.get("content");
-                    List<Map<String, Object>> parts = (List<Map<String, Object>>) contentMap.get("parts");
-                    if (parts != null && !parts.isEmpty()) {
-                        Map<String, Object> part = parts.get(0);
-                        return (String) part.get("text");
+                Object candidatesObj = response.getBody().get("candidates");
+                if (candidatesObj instanceof List<?> candidates && !candidates.isEmpty()) {
+                    Object firstCandidate = candidates.get(0);
+                    if (firstCandidate instanceof Map<?, ?> candidateMap) {
+                        Object contentObj = candidateMap.get("content");
+                        if (contentObj instanceof Map<?, ?> contentMap2) {
+                            Object partsObj = contentMap2.get("parts");
+                            if (partsObj instanceof List<?> parts && !parts.isEmpty()) {
+                                Object firstPart = parts.get(0);
+                                if (firstPart instanceof Map<?, ?> partMap) {
+                                    Object text = partMap.get("text");
+                                    if (text instanceof String s) {
+                                        return s;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-                return "âŒ No response text found.";
+                return "No response text found.";
             } else {
                 log.error("Gemini API request failed with status code: {}", response.getStatusCode());
-                return "âŒ Gemini API request failed.";
+                return "Gemini API request failed.";
             }
         } catch (Exception e) {
             log.error("Error calling Gemini API:", e);
-            return "âŒ Error calling Gemini API: " + e.getMessage();
+            return "Error calling Gemini API: " + e.getMessage();
         }
     }
 
-
     public String generateContent(String prompt) {
-        return getGeminiResponseText(prompt);  // Reuse getGeminiResponseText
+        return getGeminiResponseText(prompt);
     }
 }

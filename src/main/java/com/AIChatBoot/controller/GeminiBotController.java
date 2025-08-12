@@ -56,6 +56,8 @@ public class GeminiBotController {
                 ChatHistory chat = new ChatHistory();
                 chat.setPrompt(prompt);
                 chat.setResponse(response);
+                // Mirror response into 'content' to satisfy NOT NULL constraint in DB
+                chat.setContent(response);
                 chat.setUserId("1"); // Replace with actual user ID
                 chatRepo.save(chat);
                 log.info("Chat history saved successfully");
